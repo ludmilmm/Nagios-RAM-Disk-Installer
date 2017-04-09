@@ -13,4 +13,5 @@ chmod +x install_ramdisk.sh
 ```
 The automatic install is NOT supported on RHEL/CentOS 5. If you have an older distribution, you will need to follow the manual install instructions below. The same is valid in cases when you have a "non-standard" Nagios XI instance (custom paths, custom config locations, etc.) or you want to set up the RAM disk in a "non-default" location.
 
-For more information, read the following document: https://assets.nagios.com/downloads/nagiosxi/docs/Utilizing_A_RAM_Disk_In_NagiosXI.pdf
+For more information, read the following document: 
+https://assets.nagios.com/downloads/nagiosxi/docs/Utilizing_A_RAM_Disk_In_NagiosXI.pdf
