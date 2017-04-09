@@ -6,7 +6,7 @@ In order to install RAM disk on the Nagios XI server, run following commands fro
 ```
 cd /tmp
 wget https://github.com/ludmilmm/Nagios-RAM-Disk-Installer/archive/master.zip
-unzip Nagios-RAM-Disk-Installer-master.zip
+unzip master.zip
 cd Nagios-RAM-Disk-Installer-master/
 chmod +x install_ramdisk.sh
 ./install_ramdisk.sh
