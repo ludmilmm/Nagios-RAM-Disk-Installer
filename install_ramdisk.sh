@@ -1,7 +1,7 @@
 #!/bin/bash
 ############### RAM Disk Installer ################
 # Copyright (C) 2010-2018 Nagios Enterprises, LLC
-# Version 1.6 - 05/05/2020
+# Version 1.7 - 07/22/2020
 # Questions/issues should be posted on the Nagios
 # Support Forum at https://support.nagios.com/forum/
 # Feedback/recommendations/tips can be sent to
@@ -33,6 +33,7 @@ BACKUPDIR=/tmp/ramdiskbackup
 SYSCONFIGDIR=/etc/sysconfig
 SYSCONFIGNAGIOS=/etc/sysconfig/nagios
 SYSTEMD=/lib/systemd/system
+XIMINORVERSION=`grep full /usr/local/nagiosxi/var/xiversion | cut -d '=' -f2 | cut -d '.' -f2`
 
 USERID () {
 if [ $(id -u) -ne 0 ]; then
@@ -48,6 +49,14 @@ if [ $? -ne 0 ]; then
     echo -e "${red}$1${nocolor}"
     echo ""
     exit 1
+fi
+}
+
+# Mobile function
+MOBILE () {
+if [ $XIMINORVERSION -lt "7" ]; then        
+        sed -i '/$STATUS_FILE/c\$STATUS_FILE  = "/var/nagiosramdisk/status.dat";' $NAGIOSMOBILEPHP
+        sed -i '/$OBJECTS_FILE/c\$OBJECTS_FILE = "/var/nagiosramdisk/objects.cache";' $NAGIOSMOBILEPHP
 fi
 }
 
@@ -207,9 +216,8 @@ sed -i '/object_cache_file=/c\object_cache_file=/var/nagiosramdisk/objects.cache
 sed -i '/status_file=/c\status_file=/var/nagiosramdisk/status.dat' $NAGIOSCFG
 sed -i '/temp_path=/c\temp_path=/var/nagiosramdisk/tmp' $NAGIOSCFG
 
-# Modifying /usr/local/nagiosmobile/include.inc.php
-sed -i '/$STATUS_FILE/c\$STATUS_FILE  = "/var/nagiosramdisk/status.dat";' $NAGIOSMOBILEPHP
-sed -i '/$OBJECTS_FILE/c\$OBJECTS_FILE = "/var/nagiosramdisk/objects.cache";' $NAGIOSMOBILEPHP
+# Modifying /usr/local/nagiosmobile/include.inc.php on versions older than 5.7.x
+MOBILE
 
 # Modifying /usr/local/nrdp/server/config.inc.php
 sed -i '/check_results_dir/c\$cfg["check_results_dir"]="/var/nagiosramdisk/spool/checkresults";' $NRDPSERPHP
