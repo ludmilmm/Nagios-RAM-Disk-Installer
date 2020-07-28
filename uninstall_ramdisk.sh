@@ -3,7 +3,7 @@
 ############### RAM Disk Uninstaller ################
 
 # Copyright (C) 2010-2014 Nagios Enterprises, LLC
-# Version 1.0 - 07/24/2020
+# Version 1.1 - 07/28/2020
 
 # Questions/issues should be posted on the Nagios
 # Support Forum at https://support.nagios.com/forum/
@@ -38,6 +38,7 @@ SYSCONFIGDIR=/etc/sysconfig
 SYSCONFIGNAGIOS=/etc/sysconfig/nagios
 SYSTEMD=/lib/systemd/system
 XIMINORVERSION=`grep full /usr/local/nagiosxi/var/xiversion | cut -d '=' -f2 | cut -d '.' -f2`
+XIMAJORVERSION=`grep full /usr/local/nagiosxi/var/xiversion | cut -d '=' -f2 | cut -d '.' -f1`
 
 USERID () {
 if [ $(id -u) -ne 0 ]; then
@@ -62,6 +63,18 @@ if [ $XIMINORVERSION -lt "7" ]; then
         sed -i '/$STATUS_FILE/c\$STATUS_FILE  = "/usr/local/nagios/var/status.dat";' $NAGIOSMOBILEPHP
 		sed -i '/$OBJECTS_FILE/c\$OBJECTS_FILE = "/usr/local/nagios/var/objects.cache";' $NAGIOSMOBILEPHP
 fi
+}
+
+# Backup function
+BACKUP () {
+	echo "Backing up configs in $BACKUPDIR..."
+	mkdir -p $BACKUPDIR
+	cd $BACKUPDIR
+	if [ $XIMINORVERSION -lt "7" ] && [ $XIMAJORVERSION -lt "6" ]; then
+		tar -czvf cfgbackup.tar.gz $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG $NAGIOSMOBILEPHP
+	else
+		tar -czvf cfgbackup.tar.gz $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG
+	fi
 }
 
 # Get settings from xi-sys.cfg which give us the OS & version
@@ -119,9 +132,7 @@ echo "Checking for config errors..."
 CHKEXITSTAT "$CONFIGERR"
 
 # Backup configs prior to uninstalling RAM Disk (just in case)
-echo "Backing up configs in $BACKUPDIR..."
-mkdir -p $BACKUPDIR
-cd $BACKUPDIR
+BACKUP
 
 # Checking if we are using the "old" mobile interface
 if [ $XIMINORVERSION -lt "7" ]; then
