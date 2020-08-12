@@ -167,13 +167,16 @@ if [ "$SYSTEM" = "SYSV" ]; then
         umount $RAMDISKDIR
 else        
         systemctl stop ramdisk.service
-	systemctl disable ramdisk.service
-	rm -f $SYSTEMD/ramdisk.service
-	systemctl daemon-reload
+		systemctl disable ramdisk.service
+		rm -f $SYSTEMD/ramdisk.service
+		systemctl daemon-reload
         systemctl restart nagios.service
         systemctl restart npcd.service
         umount $RAMDISKDIR
 fi
+
+# Removing the /var/nagiosramdisk directory
+rm -rf $RAMDISKDIR
 
 # Restoring the 'process-host-perfdata-file-bulk' and the 'process-service-perfdata-file-bulk' commands
 cat > /usr/local/nagios/etc/import/commands.cfg << EOF
