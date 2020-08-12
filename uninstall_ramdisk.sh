@@ -3,7 +3,7 @@
 ############### RAM Disk Uninstaller ################
 
 # Copyright (C) 2010-2014 Nagios Enterprises, LLC
-# Version 1.1 - 07/28/2020
+# Version 1.2 - 08/12/2020
 
 # Questions/issues should be posted on the Nagios
 # Support Forum at https://support.nagios.com/forum/
@@ -134,15 +134,6 @@ CHKEXITSTAT "$CONFIGERR"
 # Backup configs prior to uninstalling RAM Disk (just in case)
 BACKUP
 
-# Checking if we are using the "old" mobile interface
-if [ $XIMINORVERSION -lt "7" ]; then
-	FILES="$INITNAGIOS $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG $NAGIOSMOBILEPHP"
-else
-	FILES="$INITNAGIOS $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG"
-fi
-
-tar -czvf cfgbackup.tar.gz $FILES
-
 # Restoring configs.
 echo "Restoring configs..."
 
@@ -175,7 +166,10 @@ if [ "$SYSTEM" = "SYSV" ]; then
         service npcd restart    
         umount $RAMDISKDIR
 else        
-        rm -f $SYSCONFIGNAGIOS
+        systemctl stop ramdisk.service
+	systemctl disable ramdisk.service
+	rm -f $SYSTEMD/ramdisk.service
+	systemctl daemon-reload
         systemctl restart nagios.service
         systemctl restart npcd.service
         umount $RAMDISKDIR
