@@ -1,7 +1,7 @@
 #!/bin/bash
 ############### RAM Disk Installer ################
 # Copyright (C) 2010-2018 Nagios Enterprises, LLC
-# Version 1.8 - 07/28/2020
+# Version 1.10 - 11/22/2022
 # Questions/issues should be posted on the Nagios
 # Support Forum at https://support.nagios.com/forum/
 # Feedback/recommendations/tips can be sent to
@@ -55,7 +55,7 @@ fi
 
 # Mobile function
 MOBILE () {
-if [ $XIMINORVERSION -lt "7" ]; then        
+if [ $XIMINORVERSION -lt "7" ] && [ $XIMAJORVERSION -lt "6" ]; then        
         sed -i '/$STATUS_FILE/c\$STATUS_FILE  = "/var/nagiosramdisk/status.dat";' $NAGIOSMOBILEPHP
         sed -i '/$OBJECTS_FILE/c\$OBJECTS_FILE = "/var/nagiosramdisk/objects.cache";' $NAGIOSMOBILEPHP
 fi
@@ -76,21 +76,28 @@ BACKUP () {
 # Get settings from xi-sys.cfg which give us the OS & version
 . /usr/local/nagiosxi/var/xi-sys.cfg
 
-# Determine if sysv or systemd is in use
+# Check if the OS & version is supported
 if [ "$distro" = "CentOS" ] || [ "$distro" = "RedHatEnterpriseServer" ] || [ "$distro" = "OracleServer" ] || [ "$distro" = "CloudLinux" ]; then
-  if [ "$ver" = "7" ] || [ "$ver" = "8" ]; then
-    SYSTEM="SYSTEMD"
+  if [ "$ver" = "7" ] || [ "$ver" = "8" ] || [ "$ver" = "9" ]; then
+    echo "Supported distro; continuing installation"
   else
-    SYSTEM="SYSV"
+    echo -e "${red}$DISTROVERSIONERR"
+	exit 1
   fi
 elif [ "$distro" = "Ubuntu" ]; then
-  if [ "$ver" = "16" ] || [ "$ver" = "18" ] || [ "$ver" = "20" ]; then
-    SYSTEM="SYSTEMD"
+  if [ "$ver" = "16" ] || [ "$ver" = "18" ] || [ "$ver" = "20" ] || [ "$ver" = "22" ]; then
+    echo "Supported distro; continuing installation"
   else
-    SYSTEM="SYSV"
+    echo -e "${red}$DISTROVERSIONERR"
+	exit 1
   fi
 elif [ "$distro" = "Debian" ]; then
-    SYSTEM="SYSTEMD"  
+  if [ "$ver" = "9" ] || [ "$ver" = "10" ] || [ "$ver" = "11" ]; then
+    echo "Supported distro; continuing installation"
+  else
+    echo -e "${red}$DISTROVERSIONERR"
+	exit 1
+  fi
 else
     echo -e "${red}$DISTROVERSIONERR${nocolor}"
   exit 1
@@ -168,9 +175,8 @@ done
 mkdir -p -m 775 ${RAMDISKDIR}
 
 # Add ramdisk
-if [ "$SYSTEM" = "SYSTEMD" ]; then
-    touch $SYSTEMD/ramdisk.service
-    echo "[Unit]
+touch $SYSTEMD/ramdisk.service
+echo "[Unit]
 Description=Ramdisk
 Requires=local-fs.target
 After=local-fs.target
@@ -184,40 +190,16 @@ ExecStartPre=$(which mount) -t tmpfs -o size=${THESIZE}m tmpfs ${RAMDISKDIR}
 ExecStartPre=$(which mkdir) -p -m 775 ${RAMDISKDIR} ${RAMDISKDIR}/tmp ${RAMDISKDIR}/spool ${RAMDISKDIR}/spool/checkresults ${RAMDISKDIR}/spool/xidpe ${RAMDISKDIR}/spool/perfdata
 ExecStart=$(which chown) -R nagios:nagios ${RAMDISKDIR}
 [Install]
-WantedBy=multi-user.target" > $SYSTEMD/ramdisk.service  
-fi
-if [ "$SYSTEM" = "SYSV" ]; then
-  mkdir -p -m 775 $SYSCONFIGDIR
-  touch $SYSCONFIGNAGIOS
-  chown nagios:nagios $SYSCONFIGNAGIOS
-  chmod 775 $SYSCONFIGNAGIOS
-  echo -e "USE_RAMDISK=1\nRAMDISKDIR=/var/nagiosramdisk\nRAMDISKSIZE=${THESIZE}\nif [ \"\`mount |grep \"\${RAMDISKDIR} type tmpfs\"\`\"X == \"X\" ]; then\n   mount -t tmpfs -o size=\${RAMDISKSIZE}m tmpfs \${RAMDISKDIR}\nfi\nmkdir -p -m 775 \${RAMDISKDIR} \${RAMDISKDIR}/tmp \${RAMDISKDIR}/spool \${RAMDISKDIR}/spool/checkresults \${RAMDISKDIR}/spool/xidpe \${RAMDISKDIR}/spool/perfdata\nchown -R nagios:nagios \${RAMDISKDIR}" > $SYSCONFIGNAGIOS
-fi
+WantedBy=multi-user.target" > $SYSTEMD/ramdisk.service
+
+# Start ramdisk service
+systemctl daemon-reload
+systemctl enable ramdisk.service
+systemctl restart ramdisk.service  
 
 # Modifying configs.
 echo "Modifying configs..."
 
-# Restart services
-if [ "$SYSTEM" = "SYSTEMD" ]; then
-  systemctl daemon-reload
-  systemctl enable ramdisk.service
-  systemctl restart ramdisk.service
-  systemctl restart nagios.service
-  systemctl restart npcd.service
-elif [ "$SYSTEM" = "SYSV" ]; then
-  if [ "$distro" = "Ubuntu" ] || [ "$distro" = "Debian" ]; then
-    update-rc.d nagios defaults
-    $INITNAGIOS restart
-    update-rc.d npcd defaults
-    $INITNPCD restart
-  else
-    chkconfig nagios on
-    $INITNAGIOS restart
-    chkconfig npcd on
-    $INITNPCD restart
-  fi
-fi
- 
 # Modifying /usr/local/nagios/etc/nagios.cfg
 sed -i '/service_perfdata_file=/c\service_perfdata_file=/var/nagiosramdisk/service-perfdata' $NAGIOSCFG
 sed -i '/host_perfdata_file=/c\host_perfdata_file=/var/nagiosramdisk/host-perfdata' $NAGIOSCFG
@@ -258,26 +240,23 @@ cd /usr/local/nagiosxi/scripts
 sleep 3
 
 # Restart apache
-if [ "$SYSTEM" = "SYSTEMD" ]; then
-  if [ "$distro" = "Ubuntu" ] || [ "$distro" = "Debian" ]; then
-    systemctl restart apache2.service
-  else
-    systemctl restart httpd.service
-  fi
-elif [ "$SYSTEM" = "SYSV" ]; then
-  if [ "$distro" = "Ubuntu" ] || [ "$distro" = "Debian" ]; then
-    /etc/init.d/apache2 restart
-  else
-    /etc/init.d/httpd restart
-  fi
+if [ "$distro" = "Ubuntu" ] || [ "$distro" = "Debian" ]; then
+	systemctl restart apache2.service
+else
+	systemctl restart httpd.service
 fi
 
-# Restart npcd
-if [ "$SYSTEM" = "SYSTEMD" ]; then  
-  systemctl restart npcd.service  
-else  
-    $INITNPCD restart
+# Restart php-fpm
+if [ $dist = el8 ]; then
+	systemctl restart php-fpm
 fi
+
+# Restart nagios
+systemctl restart nagios.service
+
+# Restart npcd
+systemctl restart npcd.service
+
 echo -e "
 ${green}All done!
 Old configs were backed up in $BACKUPDIR
