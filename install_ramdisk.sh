@@ -1,7 +1,7 @@
 #!/bin/bash
 ############### RAM Disk Installer ################
 # Copyright (C) 2010-2018 Nagios Enterprises, LLC
-# Version 1.10 - 11/22/2022
+# Version 2.0 - 02/12/2023
 # Questions/issues should be posted on the Nagios
 # Support Forum at https://support.nagios.com/forum/
 # Feedback/recommendations/tips can be sent to
@@ -63,14 +63,14 @@ fi
 
 # Backup function
 BACKUP () {
-	echo "Backing up configs in $BACKUPDIR..."
-	mkdir -p $BACKUPDIR
-	cd $BACKUPDIR
-	if [ $XIMINORVERSION -lt "7" ] && [ $XIMAJORVERSION -lt "6" ]; then
-		tar -czvf cfgbackup.tar.gz $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG $NAGIOSMOBILEPHP
-	else
-		tar -czvf cfgbackup.tar.gz $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG
-	fi
+    echo "Backing up configs in $BACKUPDIR..."
+    mkdir -p $BACKUPDIR
+    cd $BACKUPDIR
+    if [ $XIMINORVERSION -lt "7" ] && [ $XIMAJORVERSION -lt "6" ]; then
+        tar -czvf cfgbackup.tar.gz $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG $NAGIOSMOBILEPHP
+    else
+        tar -czvf cfgbackup.tar.gz $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG
+    fi
 }
 
 # Get settings from xi-sys.cfg which give us the OS & version
@@ -82,21 +82,21 @@ if [ "$distro" = "CentOS" ] || [ "$distro" = "RedHatEnterpriseServer" ] || [ "$d
     echo "Supported distro; continuing installation"
   else
     echo -e "${red}$DISTROVERSIONERR"
-	exit 1
+    exit 1
   fi
 elif [ "$distro" = "Ubuntu" ]; then
-  if [ "$ver" = "16" ] || [ "$ver" = "18" ] || [ "$ver" = "20" ] || [ "$ver" = "22" ]; then
+  if [ "$ver" = "18" ] || [ "$ver" = "20" ] || [ "$ver" = "22" ]; then
     echo "Supported distro; continuing installation"
   else
     echo -e "${red}$DISTROVERSIONERR"
-	exit 1
+    exit 1
   fi
 elif [ "$distro" = "Debian" ]; then
-  if [ "$ver" = "9" ] || [ "$ver" = "10" ] || [ "$ver" = "11" ]; then
+  if [ "$ver" = "10" ] || [ "$ver" = "11" ]; then
     echo "Supported distro; continuing installation"
   else
     echo -e "${red}$DISTROVERSIONERR"
-	exit 1
+    exit 1
   fi
 else
     echo -e "${red}$DISTROVERSIONERR${nocolor}"
@@ -192,6 +192,14 @@ ExecStart=$(which chown) -R nagios:nagios ${RAMDISKDIR}
 [Install]
 WantedBy=multi-user.target" > $SYSTEMD/ramdisk.service
 
+# Add SELinux support if SELinux is already enabled
+echo "Adding SELinux support if SELinux is already enabled..."
+if [[ `command -v selinuxenabled` ]] && [[ `semanage fcontext -l | grep nagios_content_t` ]]; then
+    $(which semanage) fcontext -a -t nagios_content_t "/var/nagiosramdisk(/.*)?"
+    sed -i 's/ExecStart=/ExecStartPre=/g' $SYSTEMD/ramdisk.service
+    sed -i "/chown/a ExecStart=$(which chcon) -R -t nagios_content_t -l s0 /var/nagiosramdisk" $SYSTEMD/ramdisk.service	
+fi
+
 # Start ramdisk service
 systemctl daemon-reload
 systemctl enable ramdisk.service
@@ -241,14 +249,14 @@ sleep 3
 
 # Restart apache
 if [ "$distro" = "Ubuntu" ] || [ "$distro" = "Debian" ]; then
-	systemctl restart apache2.service
+    systemctl restart apache2.service
 else
-	systemctl restart httpd.service
+    systemctl restart httpd.service
 fi
 
 # Restart php-fpm
-if [ $dist = el8 ]; then
-	systemctl restart php-fpm
+if [ $dist = el8 ] || [ $dist = el9 ]; then
+    systemctl restart php-fpm
 fi
 
 # Restart nagios
