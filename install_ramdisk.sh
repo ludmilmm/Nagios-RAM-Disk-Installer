@@ -1,7 +1,7 @@
 #!/bin/bash
 ############### RAM Disk Installer ################
 # Copyright (C) 2010-2018 Nagios Enterprises, LLC
-# Version 2.0 - 02/12/2023
+# Version 2.2 - 09/23/2024
 # Questions/issues should be posted on the Nagios
 # Support Forum at https://support.nagios.com/forum/
 # Feedback/recommendations/tips can be sent to
@@ -33,8 +33,7 @@ BACKUPDIR=/tmp/ramdiskbackup
 SYSCONFIGDIR=/etc/sysconfig
 SYSCONFIGNAGIOS=/etc/sysconfig/nagios
 SYSTEMD=/lib/systemd/system
-XIMINORVERSION=`grep full /usr/local/nagiosxi/var/xiversion | cut -d '=' -f2 | cut -d '.' -f2`
-XIMAJORVERSION=`grep full /usr/local/nagiosxi/var/xiversion | cut -d '=' -f2 | cut -d '.' -f1`
+XIRELEASE=`grep -w "release" /usr/local/nagiosxi/var/xiversion | cut -d '=' -f2`
 
 USERID () {
 if [ $(id -u) -ne 0 ]; then
@@ -55,7 +54,7 @@ fi
 
 # Mobile function
 MOBILE () {
-if [ $XIMINORVERSION -lt "7" ] && [ $XIMAJORVERSION -lt "6" ]; then        
+if [ $XIRELEASE -lt "50700" ]; then        
         sed -i '/$STATUS_FILE/c\$STATUS_FILE  = "/var/nagiosramdisk/status.dat";' $NAGIOSMOBILEPHP
         sed -i '/$OBJECTS_FILE/c\$OBJECTS_FILE = "/var/nagiosramdisk/objects.cache";' $NAGIOSMOBILEPHP
 fi
@@ -66,7 +65,7 @@ BACKUP () {
     echo "Backing up configs in $BACKUPDIR..."
     mkdir -p $BACKUPDIR
     cd $BACKUPDIR
-    if [ $XIMINORVERSION -lt "7" ] && [ $XIMAJORVERSION -lt "6" ]; then
+    if [ $XIRELEASE -lt "50700" ]; then
         tar -czvf cfgbackup.tar.gz $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG $NAGIOSMOBILEPHP
     else
         tar -czvf cfgbackup.tar.gz $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG
@@ -77,22 +76,22 @@ BACKUP () {
 . /usr/local/nagiosxi/var/xi-sys.cfg
 
 # Check if the OS & version is supported
-if [ "$distro" = "CentOS" ] || [ "$distro" = "RedHatEnterpriseServer" ] || [ "$distro" = "OracleServer" ] || [ "$distro" = "CloudLinux" ]; then
-  if [ "$ver" = "7" ] || [ "$ver" = "8" ] || [ "$ver" = "9" ]; then
+if [ "$distro" = "CentOS" ] || [ "$distro" = "Rocky" ] || [ "$distro" = "RedHatEnterpriseServer" ] || [ "$distro" = "OracleServer" ] || [ "$distro" = "CloudLinux" ]; then
+  if [ "$ver" = "8" ] || [ "$ver" = "9" ]; then
     echo "Supported distro; continuing installation"
   else
     echo -e "${red}$DISTROVERSIONERR"
     exit 1
   fi
 elif [ "$distro" = "Ubuntu" ]; then
-  if [ "$ver" = "18" ] || [ "$ver" = "20" ] || [ "$ver" = "22" ]; then
+  if [ "$ver" = "20" ] || [ "$ver" = "22" ] || [ "$ver" = "24" ]; then
     echo "Supported distro; continuing installation"
   else
     echo -e "${red}$DISTROVERSIONERR"
     exit 1
   fi
 elif [ "$distro" = "Debian" ]; then
-  if [ "$ver" = "10" ] || [ "$ver" = "11" ]; then
+  if [ "$ver" = "11" ] || [ "$ver" = "12" ]; then
     echo "Supported distro; continuing installation"
   else
     echo -e "${red}$DISTROVERSIONERR"
@@ -215,6 +214,7 @@ sed -i '/check_result_path=/c\check_result_path=/var/nagiosramdisk/spool/checkre
 sed -i '/object_cache_file=/c\object_cache_file=/var/nagiosramdisk/objects.cache' $NAGIOSCFG
 sed -i '/status_file=/c\status_file=/var/nagiosramdisk/status.dat' $NAGIOSCFG
 sed -i '/temp_path=/c\temp_path=/var/nagiosramdisk/tmp' $NAGIOSCFG
+sed -i '/temp_file=/c\temp_file=/var/nagiosramdisk/nagios.tmp' $NAGIOSCFG
 
 # Modifying /usr/local/nagiosmobile/include.inc.php on versions older than 5.7.x
 MOBILE
