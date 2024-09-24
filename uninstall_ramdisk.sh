@@ -3,7 +3,7 @@
 ############### RAM Disk Uninstaller ################
 
 # Copyright (C) 2010-2014 Nagios Enterprises, LLC
-# Version 1.2 - 08/12/2020
+# Version 2.2 - 09/24/2024
 
 # Questions/issues should be posted on the Nagios
 # Support Forum at https://support.nagios.com/forum/
@@ -37,8 +37,7 @@ BACKUPDIR=/tmp/ramdiskbackup
 SYSCONFIGDIR=/etc/sysconfig
 SYSCONFIGNAGIOS=/etc/sysconfig/nagios
 SYSTEMD=/lib/systemd/system
-XIMINORVERSION=`grep full /usr/local/nagiosxi/var/xiversion | cut -d '=' -f2 | cut -d '.' -f2`
-XIMAJORVERSION=`grep full /usr/local/nagiosxi/var/xiversion | cut -d '=' -f2 | cut -d '.' -f1`
+XIRELEASE=`grep -w "release" /usr/local/nagiosxi/var/xiversion | cut -d '=' -f2`
 
 USERID () {
 if [ $(id -u) -ne 0 ]; then
@@ -59,7 +58,7 @@ fi
 
 # Mobile function
 MOBILE () {
-if [ $XIMINORVERSION -lt "7" ]; then        
+if [ $XIRELEASE -lt "50700" ]; then        
         sed -i '/$STATUS_FILE/c\$STATUS_FILE  = "/usr/local/nagios/var/status.dat";' $NAGIOSMOBILEPHP
 		sed -i '/$OBJECTS_FILE/c\$OBJECTS_FILE = "/usr/local/nagios/var/objects.cache";' $NAGIOSMOBILEPHP
 fi
@@ -70,7 +69,7 @@ BACKUP () {
 	echo "Backing up configs in $BACKUPDIR..."
 	mkdir -p $BACKUPDIR
 	cd $BACKUPDIR
-	if [ $XIMINORVERSION -lt "7" ] && [ $XIMAJORVERSION -lt "6" ]; then
+	if [ $XIRELEASE -lt "50700" ]; then
 		tar -czvf cfgbackup.tar.gz $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG $NAGIOSMOBILEPHP
 	else
 		tar -czvf cfgbackup.tar.gz $INITNPCD $NAGIOSCFG $NRDPSERPHP $HTMLPHP $NCPDCFG
@@ -81,14 +80,14 @@ BACKUP () {
 . /usr/local/nagiosxi/var/xi-sys.cfg
 
 # Determine if sysv or systemd is in use
-if [ "$distro" = "CentOS" ] || [ "$distro" = "RedHatEnterpriseServer" ] || [ "$distro" = "OracleServer" ] || [ "$distro" = "CloudLinux" ]; then
-  if [ "$ver" = "7" ] || [ "$ver" = "8" ]; then
+if [ "$distro" = "CentOS" ] || [ "$distro" = "Rocky" ] || [ "$distro" = "RedHatEnterpriseServer" ] || [ "$distro" = "OracleServer" ] || [ "$distro" = "CloudLinux" ]; then
+  if [ "$ver" = "8" ] || [ "$ver" = "9" ]; then
     SYSTEM="SYSTEMD"
   else
     SYSTEM="SYSV"
   fi
 elif [ "$distro" = "Ubuntu" ]; then
-  if [ "$ver" = "16" ] || [ "$ver" = "18" ] || [ "$ver" = "20" ]; then
+  if [ "$ver" = "20" ] || [ "$ver" = "22" ] || [ "$ver" = "24" ]; then
     SYSTEM="SYSTEMD"
   else
     SYSTEM="SYSV"
@@ -144,6 +143,7 @@ sed -i '/check_result_path=/c\check_result_path=/usr/local/nagios/var/spool/chec
 sed -i '/object_cache_file=/c\object_cache_file=/usr/local/nagios/var/objects.cache' $NAGIOSCFG
 sed -i '/status_file=/c\status_file=/usr/local/nagios/var/status.dat' $NAGIOSCFG
 sed -i '/temp_path=/c\temp_path=/tmp' $NAGIOSCFG
+sed -i '/temp_file=/c\temp_path=/usr/local/nagios/var/nagios.tmp' $NAGIOSCFG
 
 # Restoring /usr/local/nagiosmobile/include.inc.php (if the "old" mobile interface is used)
 MOBILE
@@ -167,9 +167,9 @@ if [ "$SYSTEM" = "SYSV" ]; then
         umount $RAMDISKDIR
 else        
         systemctl stop ramdisk.service
-	systemctl disable ramdisk.service
-	rm -f $SYSTEMD/ramdisk.service
-	systemctl daemon-reload
+		systemctl disable ramdisk.service
+		rm -f $SYSTEMD/ramdisk.service
+		systemctl daemon-reload
         systemctl restart nagios.service
         systemctl restart npcd.service
         umount $RAMDISKDIR
